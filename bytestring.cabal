@@ -83,7 +83,7 @@ source-repository head
   location: https://github.com/haskell/bytestring
 
 library
-  build-depends:     base >= 4.9 && < 5, ghc-prim, deepseq, template-haskell
+  build-depends:     base >= 4.9 && < 5, ghc-prim, deepseq, template-haskell-lift
 
   if impl(ghc < 9.4)
     build-depends: data-array-byte >= 0.1 && < 0.2

@@ -73,7 +73,7 @@ import Data.Data                (Data(..), mkConstr, mkNoRepType, Constr, DataTy
 
 import GHC.Exts                 (IsList(..))
 
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified TemplateHaskell.Lift as TH
 
 #ifdef HS_BYTESTRING_ASSERTIONS
 import Control.Exception (assert)

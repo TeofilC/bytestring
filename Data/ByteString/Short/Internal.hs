@@ -269,7 +269,7 @@ import qualified Data.ByteString.Internal.Type as BS
 
 import qualified Data.List as List
 import qualified GHC.Exts
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified TemplateHaskell.Lift as TH
 
 -- | A compact representation of a 'Word8' vector.
 --
