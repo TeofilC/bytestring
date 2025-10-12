@@ -199,11 +199,17 @@ import GHC.Int                  (Int (..))
 import GHC.ForeignPtr           (unsafeWithForeignPtr)
 #endif
 
-import qualified Language.Haskell.TH.Lib as TH
+#if __GLASGOW_HASKELL__ >= 914
+import qualified Language.Haskell.TH.Lift as TH
+import Language.Haskell.TH.Lift (Code, Quote)
+#else
 import qualified Language.Haskell.TH.Syntax as TH
-import Language.Haskell.TH.Syntax (Lift, TExp)
+import qualified Language.Haskell.TH.Lib as TH
 #if __GLASGOW_HASKELL__ >= 900
 import Language.Haskell.TH.Syntax (Code, Quote)
+#else
+import Language.Haskell.TH.Syntax (TExp)
+#endif
 #endif
 
 #if !MIN_VERSION_base(4,13,0)
@@ -371,8 +377,14 @@ byteStringDataType :: DataType
 byteStringDataType = mkDataType "Data.ByteString.ByteString" [packConstr]
 
 -- | @since 0.11.2.0
-instance Lift ByteString where
-#if MIN_VERSION_template_haskell(2,16,0)
+instance TH.Lift ByteString where
+#if __GLASGOW_HASKELL__ >= 914
+  lift (BS ptr len) =
+    [| unsafePackLenLiteral
+        $(TH.lift len)
+        $(TH.liftAddrCompat ptr 0 (fromIntegral len))
+     |]
+#elif __GLASGOW_HASKELL__ >= 810
 -- template-haskell-2.16 first ships with ghc-8.10
   lift (BS ptr len) = [| unsafePackLenLiteral |]
     `TH.appE` TH.litE (TH.integerL (fromIntegral len))
@@ -383,10 +395,13 @@ instance Lift ByteString where
     `TH.appE` TH.litE (TH.StringPrimL $ unpackBytes bs)
 #endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
+#if __GLASGOW_HASKELL__ >= 914
+-- template-haskell-lift-0.1 first ships with ghc-9.14
+  liftTyped = TH.defaultLiftTyped
+#elif __GLASGOW_HASKELL__ >= 900
 -- template-haskell-2.17 first ships with ghc-9.0
   liftTyped = TH.unsafeCodeCoerce . TH.lift
-#elif MIN_VERSION_template_haskell(2,16,0)
+#elif __GLASGOW_HASKELL__ >= 810
 -- template-haskell-2.16 first ships with ghc-8.10
   liftTyped = TH.unsafeTExpCoerce . TH.lift
 #endif
@@ -559,17 +574,13 @@ type Quote m = (TH.Q ~ m)
 type Code m a = m (TExp a)
 #endif
 
-liftTyped :: forall a m. (MonadFail m, Quote m, Lift a) => a -> Code m a
-#if MIN_VERSION_template_haskell(2,17,0)
+liftTyped :: forall a m. (MonadFail m, Quote m, TH.Lift a) => a -> Code m a
+#if  __GLASGOW_HASKELL__ >= 914
+liftTyped = TH.defaultLiftTyped
+#elif  __GLASGOW_HASKELL__ >= 900
 liftTyped = TH.liftTyped
-
-liftCode :: forall a m. (MonadFail m, Quote m) => m (TExp a) -> Code m a
-liftCode = TH.liftCode
 #else
 liftTyped = TH.unsafeTExpCoerce . TH.lift
-
-liftCode :: forall a m. (MonadFail m, Quote m) => m TH.Exp -> Code m a
-liftCode = TH.unsafeTExpCoerce
 #endif
 
 data S2W = Octets {-# UNPACK #-} !Int [Word8]
@@ -599,7 +610,7 @@ literalFromOctetString :: (MonadFail m, Quote m) => String -> Code m ByteString
 literalFromOctetString "" = [||empty||]
 literalFromOctetString s = case foldr' op (Octets 0 []) s of
     Octets n ws -> liftTyped (unsafePackLenBytes n ws)
-    Hichar i w  -> liftCode $ fail $ "non-octet character '\\" ++
+    Hichar i w  -> error $ "non-octet character '\\" ++
         show w ++ "' at offset: " ++ show i
   where
     op :: Char -> S2W -> S2W
@@ -624,8 +635,8 @@ literalFromHex "" = [||empty||]
 literalFromHex s =
     case foldr' op (Hex 0 []) s of
         Hex n ws  -> liftTyped (unsafePackLenBytes n ws)
-        Odd i _ _ -> liftCode $ fail $ "Odd input length: " ++ show (1 + 2 * i)
-        Bad i w   -> liftCode $ fail $ "Non-hexadecimal character '\\" ++
+        Odd i _ _ -> error $ "Odd input length: " ++ show (1 + 2 * i)
+        Bad i w   -> error $ "Non-hexadecimal character '\\" ++
             show w ++ "' at offset: " ++ show i
   where
     -- Convert char to decimal digit value if result in [0, 9].
