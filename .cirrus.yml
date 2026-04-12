@@ -1,7 +1,7 @@
 task:
   name: FreeBSD
   freebsd_instance:
-    image_family: freebsd-14-2
+    image_family: freebsd-14-3
   install_script:
     - pkg install -y git gmake
     - curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 sh
@@ -18,7 +18,8 @@ task:
     platform: openbsd
   install_script: pkg_add ghc cabal-install git
   script:
-    - export CABAL_DIR=/tmp/.cabal
+    - mkdir -p /home/cabal
+    - ln -s /home/cabal $HOME/.cabal
     - cabal update
     - cabal test --test-show-details=direct
 
